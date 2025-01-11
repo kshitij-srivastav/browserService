@@ -176,4 +176,40 @@ public class RestController {
             return "Error deleting last session: " + e.getMessage();
         }
     }
+
+     @PostMapping("/close")
+    public String close(@RequestParam String browserName) {
+        log.info("Attempting to close browser: {}", browserName);
+
+        if (!System.getProperty("os.name").toLowerCase().contains("mac") &&
+                !System.getProperty("os.name").toLowerCase().contains("nix") &&
+                !System.getProperty("os.name").toLowerCase().contains("nux")) {
+            return "This feature is supported only on macOS and Linux.";
+        }
+
+        try {
+            // Step 1: Use `pgrep` to get the process ID of the browser
+            ProcessBuilder pgrepBuilder = new ProcessBuilder("pgrep", "-f", browserName);
+            Process pgrepProcess = pgrepBuilder.start();
+
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(pgrepProcess.getInputStream()))) {
+                String pid = reader.readLine(); // Get the first matching PID
+                if (pid == null || pid.isEmpty()) {
+                    log.info("No running process found for browser: {}", browserName);
+                    return "No running process found for browser: " + browserName;
+                }
+                log.info("Found PID for browser {}: {}", browserName, pid);
+
+                // Step 2: Use `kill` to terminate the process
+                ProcessBuilder killBuilder = new ProcessBuilder("kill", "-9", pid);
+                Process killProcess = killBuilder.start();
+                killProcess.waitFor();
+                log.info("Browser {} with PID {} terminated successfully.", browserName, pid);
+                return "Browser " + browserName + " closed successfully.";
+            }
+        } catch (IOException | InterruptedException e) {
+            log.error("Error closing browser: {}", e.getMessage());
+            return "Failed to close browser: " + browserName + ". Error: " + e.getMessage();
+        }
+    }
 }
